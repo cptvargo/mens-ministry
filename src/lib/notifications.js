@@ -1,64 +1,99 @@
-// Notification utilities
+// ============================================
+// Push Notification Utilities (Remote + Local)
+// ============================================
 
-// Request permission for notifications
+// 🔐 Replace with your PUBLIC VAPID key
+const VAPID_PUBLIC_KEY = "YOUR_PUBLIC_VAPID_KEY_HERE"
+
+// Convert VAPID key
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4)
+  const base64 = (base64String + padding)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/')
+
+  const rawData = window.atob(base64)
+  return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)))
+}
+
+// ============================================
+// Permission
+// ============================================
+
 export async function requestNotificationPermission() {
-  if (!('Notification' in window)) {
-    console.log('This browser does not support notifications')
-    return false
-  }
+  if (!('Notification' in window)) return false
+  if (!('serviceWorker' in navigator)) return false
 
-  if (!('serviceWorker' in navigator)) {
-    console.log('This browser does not support service workers')
-    return false
-  }
+  if (Notification.permission === 'granted') return true
+  if (Notification.permission === 'denied') return false
 
-  // Check current permission
-  if (Notification.permission === 'granted') {
-    return true
-  }
-
-  if (Notification.permission === 'denied') {
-    console.log('Notification permission was denied')
-    return false
-  }
-
-  // Request permission
   const permission = await Notification.requestPermission()
   return permission === 'granted'
 }
 
-// Register service worker
+// ============================================
+// Service Worker
+// ============================================
+
 export async function registerServiceWorker() {
-  if (!('serviceWorker' in navigator)) {
-    console.log('Service workers not supported')
-    return null
-  }
+  if (!('serviceWorker' in navigator)) return null
 
   try {
     const registration = await navigator.serviceWorker.register('/sw.js', {
       scope: '/'
     })
-    console.log('Service Worker registered:', registration)
     return registration
   } catch (error) {
-    console.error('Service Worker registration failed:', error)
+    console.error('SW registration failed:', error)
     return null
   }
 }
 
-// Show a local notification (when app is open or in background)
-export async function showNotification(title, options = {}) {
-  const hasPermission = await requestNotificationPermission()
-  
-  if (!hasPermission) {
-    console.log('No notification permission')
-    return false
-  }
+// ============================================
+// Push Subscription (REMOTE PUSH)
+// ============================================
 
-  // Get service worker registration
+export async function subscribeToPush() {
+  const hasPermission = await requestNotificationPermission()
+  if (!hasPermission) return null
+
   const registration = await navigator.serviceWorker.ready
 
-  // Show notification through service worker
+  // Check existing subscription
+  const existing = await registration.pushManager.getSubscription()
+  if (existing) {
+    return existing
+  }
+
+  // Create new subscription
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+  })
+
+  return subscription
+}
+
+// Optional: Unsubscribe user
+export async function unsubscribeFromPush() {
+  const registration = await navigator.serviceWorker.ready
+  const subscription = await registration.pushManager.getSubscription()
+
+  if (subscription) {
+    await subscription.unsubscribe()
+  }
+}
+
+// ============================================
+// Local Notifications (App-triggered)
+// ============================================
+
+export async function showNotification(title, options = {}) {
+  const hasPermission = await requestNotificationPermission()
+  if (!hasPermission) return false
+
+  const registration = await navigator.serviceWorker.ready
+
   await registration.showNotification(title, {
     icon: '/pwa-192x192.png',
     badge: '/pwa-192x192.png',
@@ -69,46 +104,30 @@ export async function showNotification(title, options = {}) {
   return true
 }
 
-// Initialize notifications for the app
-export async function initializeNotifications() {
-  // Register service worker
+// ============================================
+// Initialize (Call on Button Click)
+// ============================================
+
+export async function enablePushNotifications(sendToServer) {
+  // sendToServer(subscription) should save to Supabase
+
   const registration = await registerServiceWorker()
-  
-  if (!registration) {
-    return false
+  if (!registration) return false
+
+  const subscription = await subscribeToPush()
+  if (!subscription) return false
+
+  if (sendToServer && typeof sendToServer === 'function') {
+    await sendToServer(subscription)
   }
 
-  // Request permission
-  const hasPermission = await requestNotificationPermission()
-  
-  return hasPermission
+  return true
 }
 
-// Send notification about new message
-export async function notifyNewMessage(userName, message, roomName) {
-  await showNotification(`${userName} in ${roomName}`, {
-    body: message.length > 100 ? message.substring(0, 100) + '...' : message,
-    tag: 'new-message',
-    data: {
-      url: '/',
-      timestamp: Date.now()
-    }
-  })
-}
+// ============================================
+// Helpers
+// ============================================
 
-// Send notification about new event
-export async function notifyNewEvent(eventTitle, eventDate) {
-  await showNotification('New Event Posted', {
-    body: `${eventTitle} - ${eventDate}`,
-    tag: 'new-event',
-    data: {
-      url: '/',
-      timestamp: Date.now()
-    }
-  })
-}
-
-// Check if notifications are enabled
 export function areNotificationsEnabled() {
   return Notification.permission === 'granted'
 }
