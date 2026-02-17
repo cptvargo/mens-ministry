@@ -1,1 +1,91 @@
-if(!self.define){let e,i={};const s=(s,n)=>(s=new URL(s+".js",n).href,i[s]||new Promise(i=>{if("document"in self){const e=document.createElement("script");e.src=s,e.onload=i,document.head.appendChild(e)}else e=s,importScripts(s),i()}).then(()=>{let e=i[s];if(!e)throw new Error(`Module ${s} didn’t register its module`);return e}));self.define=(n,c)=>{const r=e||("document"in self?document.currentScript.src:"")||location.href;if(i[r])return;let o={};const t=e=>s(e,r),d={module:{uri:r},exports:o,require:t};i[r]=Promise.all(n.map(e=>d[e]||t(e))).then(e=>(c(...e),o))}}define(["./workbox-3896e580"],function(e){"use strict";self.skipWaiting(),e.clientsClaim(),e.precacheAndRoute([{url:"vite.svg",revision:"8e3a10e157f75ada21ab742c022d5430"},{url:"registerSW.js",revision:"6f1cef695bbf943800948577f0d17cfe"},{url:"index.html",revision:"47c5acf842ca4a7836bdded9f3dde6fd"},{url:"icon.svg",revision:"afc1d237fcedc13007f2bb5c2677df50"},{url:"favicon.ico",revision:"d41d8cd98f00b204e9800998ecf8427e"},{url:"assets/index-BxG7f04h.css",revision:null},{url:"assets/index-7o7aihiU.js",revision:null},{url:"favicon.ico",revision:"d41d8cd98f00b204e9800998ecf8427e"},{url:"manifest.webmanifest",revision:"ce7b5019e760fe3e412784cb9f23de60"}],{}),e.cleanupOutdatedCaches(),e.registerRoute(new e.NavigationRoute(e.createHandlerBoundToURL("index.html"))),e.registerRoute(/^https:\/\/.*\.supabase\.co\/.*/i,new e.NetworkFirst({cacheName:"supabase-cache",plugins:[new e.ExpirationPlugin({maxEntries:50,maxAgeSeconds:86400}),new e.CacheableResponsePlugin({statuses:[0,200]})]}),"GET")});
+// Service Worker for Push Notifications
+// This runs in the background even when the app is closed
+
+self.addEventListener('install', (event) => {
+  console.log('Service Worker installed')
+  self.skipWaiting()
+})
+
+self.addEventListener('activate', (event) => {
+  console.log('Service Worker activated')
+  event.waitUntil(self.clients.claim())
+})
+
+// Handle push notifications
+self.addEventListener('push', (event) => {
+  console.log('Push notification received:', event)
+  
+  let data = {}
+  
+  if (event.data) {
+    try {
+      data = event.data.json()
+    } catch (e) {
+      data = {
+        title: 'New Message',
+        body: event.data.text()
+      }
+    }
+  }
+
+  const title = data.title || 'Men\'s Ministry Connect'
+  const options = {
+    body: data.body || 'You have a new message',
+    icon: '/pwa-192x192.png',
+    badge: '/pwa-192x192.png',
+    vibrate: [200, 100, 200],
+    data: {
+      url: data.url || '/',
+      dateOfArrival: Date.now()
+    },
+    actions: [
+      {
+        action: 'open',
+        title: 'Open App'
+      }
+    ],
+    requireInteraction: false,
+    tag: data.tag || 'message-notification'
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  )
+})
+
+// Handle notification clicks
+self.addEventListener('notificationclick', (event) => {
+  console.log('Notification clicked:', event)
+  
+  event.notification.close()
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // If app is already open, focus it
+        for (const client of clientList) {
+          if (client.url.includes(self.location.origin) && 'focus' in client) {
+            return client.focus()
+          }
+        }
+        // Otherwise open the app
+        if (self.clients.openWindow) {
+          return self.clients.openWindow('/')
+        }
+      })
+  )
+})
+
+// Sync messages when online
+self.addEventListener('sync', (event) => {
+  console.log('Background sync:', event)
+  if (event.tag === 'sync-messages') {
+    event.waitUntil(syncMessages())
+  }
+})
+
+async function syncMessages() {
+  // This would sync with a server if you had one
+  // For now, just a placeholder
+  console.log('Syncing messages...')
+}
