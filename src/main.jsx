@@ -1,20 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import App from "./App.jsx";
+import "./index.css";
 
-function Test() {
-  return (
-    <div
-      style={{
-        height: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "24px",
-      }}
-    >
-      Mobile Test OK
-    </div>
-  );
-}
-
-ReactDOM.createRoot(document.getElementById("root")).render(<Test />);
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);

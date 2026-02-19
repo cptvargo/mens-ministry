@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { SimpleEntry } from "./components/SimpleEntry";
 import { ChatRoom } from "./components/ChatRoom";
-import { Calendar, Wrench, Trash2, User, Bell, BellOff } from "lucide-react";
-import { enableRemotePush, areNotificationsEnabled } from "./lib/notifications";
+import { Calendar, Wrench, Trash2, User } from "lucide-react";
 
 const ROOMS = {
   ministry: {
@@ -36,8 +35,6 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [activeRoom, setActiveRoom] = useState("ministry");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const [showNotificationBanner, setShowNotificationBanner] = useState(false);
 
   useEffect(() => {
     const deviceId = getDeviceId();
@@ -45,49 +42,12 @@ function App() {
     if (savedProfile) {
       try {
         setProfile(JSON.parse(savedProfile));
-        checkNotifications();
       } catch (error) {
         console.error("Error loading profile:", error);
       }
     }
     setLoading(false);
   }, []);
-
-  const checkNotifications = () => {
-    const enabled = areNotificationsEnabled();
-    setNotificationsEnabled(enabled);
-    const dismissed = localStorage.getItem("notification-banner-dismissed");
-    if (!enabled && !dismissed) {
-      setShowNotificationBanner(true);
-    }
-  };
-
-  const handleEnableNotifications = async () => {
-    try {
-      const success = await enableRemotePush(async (subscription) => {
-        console.log("Push subscription:", subscription);
-
-        // TODO: send subscription to Supabase
-        // For now we just log it
-      });
-
-      if (success) {
-        setNotificationsEnabled(true);
-        setShowNotificationBanner(false);
-      } else {
-        alert(
-          "To enable notifications, please allow them in your browser/phone settings for this site.",
-        );
-      }
-    } catch (error) {
-      console.error("Push setup error:", error);
-    }
-  };
-
-  const handleDismissBanner = () => {
-    setShowNotificationBanner(false);
-    localStorage.setItem("notification-banner-dismissed", "true");
-  };
 
   const handleProfileComplete = (newProfile) => {
     const deviceId = getDeviceId();
@@ -96,7 +56,6 @@ function App() {
       JSON.stringify(newProfile),
     );
     setProfile(newProfile);
-    checkNotifications();
   };
 
   const handleDeleteProfile = () => {
@@ -125,32 +84,6 @@ function App() {
 
   return (
     <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
-      {/* Notification Banner */}
-      {showNotificationBanner && (
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 flex-1">
-            <Bell className="w-5 h-5 flex-shrink-0" />
-            <p className="text-sm font-medium">
-              Enable notifications for new message alerts
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleEnableNotifications}
-              className="px-4 py-2 bg-white text-blue-700 rounded-lg font-semibold text-sm hover:bg-blue-50 transition-colors"
-            >
-              Enable
-            </button>
-            <button
-              onClick={handleDismissBanner}
-              className="px-3 py-2 hover:bg-white/10 rounded-lg transition-colors"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -204,29 +137,13 @@ function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {notificationsEnabled ? (
-              <div className="flex items-center gap-1.5 px-3 py-2 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded-lg text-xs font-medium">
-                <Bell className="w-4 h-4" />
-                <span className="hidden sm:inline">Alerts On</span>
-              </div>
-            ) : (
-              <button
-                onClick={handleEnableNotifications}
-                className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-medium hover:bg-blue-50 hover:text-blue-600 transition-colors"
-              >
-                <BellOff className="w-4 h-4" />
-                <span className="hidden sm:inline">Enable Alerts</span>
-              </button>
-            )}
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-red-50 hover:text-red-600 text-slate-700 dark:text-slate-300 rounded-lg transition-colors text-sm font-medium"
-            >
-              <Trash2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Sign Out</span>
-            </button>
-          </div>
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-red-50 hover:text-red-600 text-slate-700 dark:text-slate-300 rounded-lg transition-colors text-sm font-medium"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Sign Out</span>
+          </button>
         </div>
 
         {/* Room Tabs */}

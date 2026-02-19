@@ -1,134 +1,62 @@
-import { useState, useEffect, useRef } from 'react'
-import { Send, Loader, Bell, BellOff } from 'lucide-react'
-import { ChatMessage } from './ChatMessage'
-import { EventCard } from './EventCard'
-import { useEvents } from '../hooks/useEvents'
-import { notifyNewMessage, areNotificationsEnabled } from '../lib/notifications'
+import { useState, useRef, useEffect } from "react";
+import { Send, Loader } from "lucide-react";
+import { ChatMessage } from "./ChatMessage";
+import { EventCard } from "./EventCard";
+import { useEvents } from "../hooks/useEvents";
+import { useMessages } from "../hooks/useMessages";
 
-export function ChatRoom({ roomId, roomName, roomDescription, userId, userName, userAvatar, showEvents = false }) {
-  const [messages, setMessages] = useState([])
-  const [newMessage, setNewMessage] = useState('')
-  const [sending, setSending] = useState(false)
-  const [notificationsOn, setNotificationsOn] = useState(false)
-  const messagesEndRef = useRef(null)
-  const { events } = useEvents()
-  const lastMessageCountRef = useRef(0)
-
-  // Check notification status
-  useEffect(() => {
-    setNotificationsOn(areNotificationsEnabled())
-  }, [])
-
-  // Load messages from localStorage
-  useEffect(() => {
-    const loadMessages = () => {
-      const savedMessages = localStorage.getItem(`messages-${roomId}`)
-      if (savedMessages) {
-        try {
-          const parsed = JSON.parse(savedMessages)
-          
-          // Check if there are new messages (notification trigger)
-          if (parsed.length > lastMessageCountRef.current && lastMessageCountRef.current > 0) {
-            // New message arrived!
-            const newMsg = parsed[parsed.length - 1]
-            
-            // Only notify if message is from someone else
-            if (newMsg.user_id !== userId) {
-              notifyNewMessage(
-                newMsg.profiles?.name || 'Someone',
-                newMsg.content,
-                roomName
-              )
-            }
-          }
-          
-          lastMessageCountRef.current = parsed.length
-          setMessages(parsed)
-        } catch (error) {
-          console.error('Error loading messages:', error)
-        }
-      }
-    }
-
-    loadMessages()
-
-    // Poll for new messages every 2 seconds
-    const interval = setInterval(loadMessages, 2000)
-
-    return () => clearInterval(interval)
-  }, [roomId, userId, roomName])
+export function ChatRoom({
+  roomId,
+  roomName,
+  roomDescription,
+  userId,
+  userName,
+  userAvatar,
+  showEvents = false,
+}) {
+  const [newMessage, setNewMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const messagesEndRef = useRef(null);
+  const { events } = useEvents();
+  const { messages, loading, sendMessage } = useMessages(roomId);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    scrollToBottom();
+  }, [messages]);
 
   const handleSend = async (e) => {
-    e.preventDefault()
-    if (!newMessage.trim() || sending) return
+    e.preventDefault();
+    if (!newMessage.trim() || sending) return;
 
-    setSending(true)
+    setSending(true);
     try {
-      const message = {
-        id: Date.now().toString() + '-' + Math.random(),
-        room_id: roomId,
-        user_id: userId,
-        content: newMessage.trim(),
-        created_at: new Date().toISOString(),
-        profiles: {
-          name: userName,
-          avatar_url: userAvatar
-        }
-      }
-
-      // Add to messages array
-      const updatedMessages = [...messages, message]
-      setMessages(updatedMessages)
-
-      // Save to localStorage
-      localStorage.setItem(`messages-${roomId}`, JSON.stringify(updatedMessages))
-
-      setNewMessage('')
+      await sendMessage(userId, userName, userAvatar, newMessage.trim());
+      setNewMessage("");
     } catch (error) {
-      console.error('Error sending message:', error)
+      console.error("Error sending message:", error);
+      alert("Failed to send message. Please try again.");
     } finally {
-      setSending(false)
+      setSending(false);
     }
-  }
+  };
 
   // Filter events for this room
   const upcomingEvents = showEvents
-    ? events.filter(e => new Date(e.date) >= new Date()).slice(0, 3)
-    : []
+    ? events.filter((e) => new Date(e.date) >= new Date()).slice(0, 3)
+    : [];
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold mb-1">{roomName}</h2>
-            {roomDescription && (
-              <p className="text-sm text-blue-100">{roomDescription}</p>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {notificationsOn ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-white/20 rounded-lg">
-                <Bell className="w-4 h-4" />
-                <span className="text-xs font-medium hidden sm:inline">Notifications On</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-lg opacity-50">
-                <BellOff className="w-4 h-4" />
-                <span className="text-xs font-medium hidden sm:inline">Notifications Off</span>
-              </div>
-            )}
-          </div>
-        </div>
+        <h2 className="text-xl font-bold mb-1">{roomName}</h2>
+        {roomDescription && (
+          <p className="text-sm text-blue-100">{roomDescription}</p>
+        )}
       </div>
 
       {/* Events Section */}
@@ -139,7 +67,7 @@ export function ChatRoom({ roomId, roomName, roomDescription, userId, userName, 
               Upcoming Events
             </h3>
             <div className="space-y-3">
-              {upcomingEvents.map(event => (
+              {upcomingEvents.map((event) => (
                 <EventCard key={event.id} event={event} userId={userId} />
               ))}
             </div>
@@ -149,7 +77,16 @@ export function ChatRoom({ roomId, roomName, roomDescription, userId, userName, 
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-6 py-4 bg-slate-50 dark:bg-slate-900">
-        {messages.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+              <p className="text-slate-500 dark:text-slate-400">
+                Loading messages...
+              </p>
+            </div>
+          </div>
+        ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -186,11 +123,11 @@ export function ChatRoom({ roomId, roomName, roomDescription, userId, userName, 
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Type your message..."
             className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-700 border-0 rounded-xl text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-            disabled={sending}
+            disabled={sending || loading}
           />
           <button
             type="submit"
-            disabled={!newMessage.trim() || sending}
+            disabled={!newMessage.trim() || sending || loading}
             className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transform hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center gap-2"
           >
             {sending ? (
@@ -205,5 +142,5 @@ export function ChatRoom({ roomId, roomName, roomDescription, userId, userName, 
         </form>
       </div>
     </div>
-  )
+  );
 }
