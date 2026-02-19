@@ -6,40 +6,21 @@ export function useMessages(roomId) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Fetch initial messages
+    // Fetch messages immediately
     fetchMessages()
 
-    // Subscribe to new messages
-    const channel = supabase
-      .channel(`room:${roomId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `room_id=eq.${roomId}`
-        },
-        (payload) => {
-          console.log('New message received:', payload)
-          // Add the new message with user info from localStorage
-          const newMessage = {
-            ...payload.new,
-            profiles: null // Will be populated from local user data
-          }
-          setMessages(current => [...current, newMessage])
-        }
-      )
-      .subscribe()
+    // Then poll every 3 seconds for new messages
+    const interval = setInterval(() => {
+      fetchMessages(true) // silent refresh
+    }, 3000)
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    return () => clearInterval(interval)
   }, [roomId])
 
-  const fetchMessages = async () => {
+  const fetchMessages = async (silent = false) => {
     try {
-      // Just fetch messages without profiles join
+      if (!silent) setLoading(true)
+
       const { data, error } = await supabase
         .from('messages')
         .select('*')
@@ -52,13 +33,12 @@ export function useMessages(roomId) {
     } catch (error) {
       console.error('Error fetching messages:', error)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
   const sendMessage = async (userId, userName, userAvatar, content) => {
     try {
-      // Insert message with user info embedded in metadata
       const { error } = await supabase
         .from('messages')
         .insert({
@@ -70,6 +50,9 @@ export function useMessages(roomId) {
         })
 
       if (error) throw error
+
+      // Immediately fetch to show your own message
+      await fetchMessages(true)
     } catch (error) {
       console.error('Error sending message:', error)
       throw error
