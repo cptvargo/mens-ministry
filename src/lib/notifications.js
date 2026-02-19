@@ -55,9 +55,12 @@ export async function registerServiceWorker() {
   }
 
   try {
-    const registration = await navigator.serviceWorker.register('/sw.js', {
-      scope: '/'
+    const swPath = `${import.meta.env.BASE_URL}sw.js`
+
+    const registration = await navigator.serviceWorker.register(swPath, {
+      scope: import.meta.env.BASE_URL
     })
+
     console.log('Service Worker registered:', registration)
     return registration
   } catch (error) {
@@ -65,6 +68,7 @@ export async function registerServiceWorker() {
     return null
   }
 }
+
 
 // ============================================
 // Subscribe to Remote Push (NEW)
@@ -115,8 +119,9 @@ export async function showNotification(title, options = {}) {
   const registration = await navigator.serviceWorker.ready
 
   await registration.showNotification(title, {
-    icon: '/pwa-192x192.png',
-    badge: '/pwa-192x192.png',
+icon: `${import.meta.env.BASE_URL}pwa-192x192.png`,
+badge: `${import.meta.env.BASE_URL}pwa-192x192.png`,
+
     vibrate: [200, 100, 200],
     ...options
   })
