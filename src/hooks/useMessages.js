@@ -22,7 +22,12 @@ export function useMessages(roomId) {
         },
         (payload) => {
           console.log('New message received:', payload)
-          setMessages(current => [...current, payload.new])
+          // Add the new message with user info from localStorage
+          const newMessage = {
+            ...payload.new,
+            profiles: null // Will be populated from local user data
+          }
+          setMessages(current => [...current, newMessage])
         }
       )
       .subscribe()
@@ -34,15 +39,10 @@ export function useMessages(roomId) {
 
   const fetchMessages = async () => {
     try {
+      // Just fetch messages without profiles join
       const { data, error } = await supabase
         .from('messages')
-        .select(`
-          *,
-          profiles:user_id (
-            name,
-            avatar_url
-          )
-        `)
+        .select('*')
         .eq('room_id', roomId)
         .order('created_at', { ascending: true })
 
@@ -58,31 +58,15 @@ export function useMessages(roomId) {
 
   const sendMessage = async (userId, userName, userAvatar, content) => {
     try {
-      // First, ensure user has a profile in Supabase
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', userId)
-        .single()
-
-      if (!existingProfile) {
-        // Create profile if it doesn't exist
-        await supabase
-          .from('profiles')
-          .insert({
-            id: userId,
-            name: userName,
-            avatar_url: userAvatar
-          })
-      }
-
-      // Insert message
+      // Insert message with user info embedded in metadata
       const { error } = await supabase
         .from('messages')
         .insert({
           room_id: roomId,
           user_id: userId,
-          content: content
+          content: content,
+          user_name: userName,
+          user_avatar: userAvatar
         })
 
       if (error) throw error
