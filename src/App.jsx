@@ -1,98 +1,110 @@
-import { useState, useEffect } from 'react'
-import { SimpleEntry } from './components/SimpleEntry'
-import { ChatRoom } from './components/ChatRoom'
-import { Calendar, Wrench, Trash2, User, Bell, BellOff } from 'lucide-react'
-import { initializeNotifications, areNotificationsEnabled } from './lib/notifications'
+import { useState, useEffect } from "react";
+import { SimpleEntry } from "./components/SimpleEntry";
+import { ChatRoom } from "./components/ChatRoom";
+import { Calendar, Wrench, Trash2, User, Bell, BellOff } from "lucide-react";
+import { enableRemotePush, areNotificationsEnabled } from "./lib/notifications";
 
 const ROOMS = {
   ministry: {
-    id: 'ministry-events',
-    name: 'Ministry Events',
-    description: 'Schedule, gatherings, and ministry activities',
+    id: "ministry-events",
+    name: "Ministry Events",
+    description: "Schedule, gatherings, and ministry activities",
     icon: Calendar,
     showEvents: true,
   },
   workdays: {
-    id: 'work-days',
-    name: 'Community Work Days',
-    description: 'Help requests and service opportunities',
+    id: "work-days",
+    name: "Community Work Days",
+    description: "Help requests and service opportunities",
     icon: Wrench,
     showEvents: false,
   },
-}
+};
 
 function getDeviceId() {
-  let deviceId = localStorage.getItem('device-id')
+  let deviceId = localStorage.getItem("device-id");
   if (!deviceId) {
-    deviceId = 'device-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9)
-    localStorage.setItem('device-id', deviceId)
+    deviceId =
+      "device-" + Date.now() + "-" + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem("device-id", deviceId);
   }
-  return deviceId
+  return deviceId;
 }
 
 function App() {
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [activeRoom, setActiveRoom] = useState('ministry')
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false)
-  const [showNotificationBanner, setShowNotificationBanner] = useState(false)
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeRoom, setActiveRoom] = useState("ministry");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [showNotificationBanner, setShowNotificationBanner] = useState(false);
 
   useEffect(() => {
-    const deviceId = getDeviceId()
-    const savedProfile = localStorage.getItem(`user-profile-${deviceId}`)
+    const deviceId = getDeviceId();
+    const savedProfile = localStorage.getItem(`user-profile-${deviceId}`);
     if (savedProfile) {
       try {
-        setProfile(JSON.parse(savedProfile))
-        checkNotifications()
+        setProfile(JSON.parse(savedProfile));
+        checkNotifications();
       } catch (error) {
-        console.error('Error loading profile:', error)
+        console.error("Error loading profile:", error);
       }
     }
-    setLoading(false)
-  }, [])
+    setLoading(false);
+  }, []);
 
   const checkNotifications = () => {
-    const enabled = areNotificationsEnabled()
-    setNotificationsEnabled(enabled)
-    const dismissed = localStorage.getItem('notification-banner-dismissed')
+    const enabled = areNotificationsEnabled();
+    setNotificationsEnabled(enabled);
+    const dismissed = localStorage.getItem("notification-banner-dismissed");
     if (!enabled && !dismissed) {
-      setShowNotificationBanner(true)
+      setShowNotificationBanner(true);
     }
-  }
+  };
 
   const handleEnableNotifications = async () => {
     try {
-      const enabled = await initializeNotifications()
-      if (enabled) {
-        setNotificationsEnabled(true)
-        setShowNotificationBanner(false)
+      const success = await enableRemotePush(async (subscription) => {
+        console.log("Push subscription:", subscription);
+
+        // TODO: send subscription to Supabase
+        // For now we just log it
+      });
+
+      if (success) {
+        setNotificationsEnabled(true);
+        setShowNotificationBanner(false);
       } else {
-        alert('To enable notifications, please allow them in your browser/phone settings for this site.')
+        alert(
+          "To enable notifications, please allow them in your browser/phone settings for this site.",
+        );
       }
     } catch (error) {
-      console.error('Notification error:', error)
+      console.error("Push setup error:", error);
     }
-  }
+  };
 
   const handleDismissBanner = () => {
-    setShowNotificationBanner(false)
-    localStorage.setItem('notification-banner-dismissed', 'true')
-  }
+    setShowNotificationBanner(false);
+    localStorage.setItem("notification-banner-dismissed", "true");
+  };
 
   const handleProfileComplete = (newProfile) => {
-    const deviceId = getDeviceId()
-    localStorage.setItem(`user-profile-${deviceId}`, JSON.stringify(newProfile))
-    setProfile(newProfile)
-    checkNotifications()
-  }
+    const deviceId = getDeviceId();
+    localStorage.setItem(
+      `user-profile-${deviceId}`,
+      JSON.stringify(newProfile),
+    );
+    setProfile(newProfile);
+    checkNotifications();
+  };
 
   const handleDeleteProfile = () => {
-    const deviceId = getDeviceId()
-    localStorage.removeItem(`user-profile-${deviceId}`)
-    setProfile(null)
-    setShowDeleteConfirm(false)
-  }
+    const deviceId = getDeviceId();
+    localStorage.removeItem(`user-profile-${deviceId}`);
+    setProfile(null);
+    setShowDeleteConfirm(false);
+  };
 
   if (loading) {
     return (
@@ -102,24 +114,25 @@ function App() {
           <p className="text-white text-lg font-medium">Loading...</p>
         </div>
       </div>
-    )
+    );
   }
 
   if (!profile) {
-    return <SimpleEntry onComplete={handleProfileComplete} />
+    return <SimpleEntry onComplete={handleProfileComplete} />;
   }
 
-  const currentRoom = ROOMS[activeRoom]
+  const currentRoom = ROOMS[activeRoom];
 
   return (
     <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
-
       {/* Notification Banner */}
       {showNotificationBanner && (
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 flex-1">
             <Bell className="w-5 h-5 flex-shrink-0" />
-            <p className="text-sm font-medium">Enable notifications for new message alerts</p>
+            <p className="text-sm font-medium">
+              Enable notifications for new message alerts
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -128,7 +141,10 @@ function App() {
             >
               Enable
             </button>
-            <button onClick={handleDismissBanner} className="px-3 py-2 hover:bg-white/10 rounded-lg transition-colors">
+            <button
+              onClick={handleDismissBanner}
+              className="px-3 py-2 hover:bg-white/10 rounded-lg transition-colors"
+            >
               ✕
             </button>
           </div>
@@ -139,7 +155,9 @@ function App() {
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 max-w-sm w-full">
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white text-center mb-2">Delete Profile?</h3>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white text-center mb-2">
+              Delete Profile?
+            </h3>
             <p className="text-slate-600 dark:text-slate-400 text-center mb-6">
               You'll need to set up your profile again on this device.
             </p>
@@ -167,14 +185,22 @@ function App() {
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-md">
               {profile.avatar ? (
-                <img src={profile.avatar} alt={profile.name} className="w-full h-full object-cover" />
+                <img
+                  src={profile.avatar}
+                  alt={profile.name}
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 <User className="w-6 h-6 text-white" />
               )}
             </div>
             <div>
-              <p className="text-sm font-bold text-slate-900 dark:text-white">{profile.name}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Men's Ministry</p>
+              <p className="text-sm font-bold text-slate-900 dark:text-white">
+                {profile.name}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Men's Ministry
+              </p>
             </div>
           </div>
 
@@ -206,22 +232,22 @@ function App() {
         {/* Room Tabs */}
         <div className="flex border-t border-slate-200 dark:border-slate-700">
           {Object.entries(ROOMS).map(([key, room]) => {
-            const Icon = room.icon
-            const isActive = activeRoom === key
+            const Icon = room.icon;
+            const isActive = activeRoom === key;
             return (
               <button
                 key={key}
                 onClick={() => setActiveRoom(key)}
                 className={`flex-1 flex items-center justify-center gap-2 px-4 py-4 text-sm font-semibold transition-all ${
                   isActive
-                    ? 'bg-gradient-to-b from-blue-600 to-blue-700 text-white shadow-md'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+                    ? "bg-gradient-to-b from-blue-600 to-blue-700 text-white shadow-md"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
                 }`}
               >
                 <Icon className="w-5 h-5" />
                 <span>{room.name}</span>
               </button>
-            )
+            );
           })}
         </div>
       </nav>
@@ -240,7 +266,7 @@ function App() {
         />
       </div>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
